@@ -1,6 +1,6 @@
 [submodule "desktop-apps"]
 	path = desktop-apps
-	url = https://github.com/Euro-Office/desktop-apps.git
+	url = https://github.com/W4MEX/W4-DesktopApps.git
 [submodule "desktop-sdk"]
 	path = desktop-sdk
 	url = https://github.com/Euro-Office/desktop-sdk.git
@@ -15,7 +15,7 @@
 	url = https://github.com/Euro-Office/dictionaries.git
 [submodule "web-apps"]
 	path = web-apps
-	url = https://github.com/Euro-Office/web-apps.git
+	url = https://github.com/W4MEX/W4-Office-WebApps.git
 [submodule "document-templates"]
 	path = document-templates
 	url = https://github.com/Euro-Office/document-templates.git
