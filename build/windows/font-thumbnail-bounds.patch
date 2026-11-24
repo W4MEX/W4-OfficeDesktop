@@ -1,0 +1,24 @@
+diff --git a/DesktopEditor/fontengine/ApplicationFontsWorker.cpp b/DesktopEditor/fontengine/ApplicationFontsWorker.cpp
+index 4f292c2..17c2ba2 100644
+--- a/DesktopEditor/fontengine/ApplicationFontsWorker.cpp
++++ b/DesktopEditor/fontengine/ApplicationFontsWorker.cpp
+@@ -1474,7 +1474,8 @@ public:
+ 			oFrame.SaveFile(strThumbnailPath, 4);
+ 
+ 			LONG lBinarySize = lWidthPix * lHeightPix;
+-			BYTE* pBinaryFormat = new BYTE[lBinarySize + 12];
++			// A zero alpha value also needs a run-length byte. Reserve the worst case.
++			BYTE* pBinaryFormat = new BYTE[2 * static_cast<size_t>(lBinarySize) + 12];
+ 
+ 			pBinaryFormat[0] = 0xFF & (lWidthPix >> 24);
+ 			pBinaryFormat[1] = 0xFF & (lWidthPix >> 16);
+@@ -1513,7 +1514,8 @@ public:
+ 						++nIndexCur;
+ 						pImageDataAlpha += 4;
+ 
+-						if (0 != *pImageDataAlpha)
++						// Advancing past the last pixel must not read beyond the image.
++						if (nIndexCur < nIndexCurLimit && 0 != *pImageDataAlpha)
+ 							break;
+ 					}
+ 
