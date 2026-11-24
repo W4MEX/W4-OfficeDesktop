@@ -1,5 +1,15 @@
 # W4 Office 9.3.9.1 Windows and USB revision 3
 
+## Publish a W4 release
+
+Create the GitHub Release manually and attach the verified Windows installer,
+USB archive, and SHA-256 checksums. Create the release tag from a commit that
+already contains the manual release workflow changes. A tag pointing to an
+older commit can still run the workflow definitions stored in that commit.
+
+WinGet distribution is disabled until W4 has its own verified package
+identifier and publishing workflow.
+
 The core patch bounds the reads when encoding transparent pixels in font
 thumbnails and reserves enough space for the encoded output.
 
