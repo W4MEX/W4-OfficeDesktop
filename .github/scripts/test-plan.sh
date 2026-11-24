@@ -8,23 +8,22 @@ set -euo pipefail
 wf=$1; dir=$(mktemp -d)
 yq '.jobs.plan.steps[0].run' "$wf" > "$dir/run.sh"
 export BRANDS=$(yq '.jobs.plan.steps[0].env.BRANDS' "$wf")
-mkdir "$dir/bin"; printf '#!/bin/sh\nprintf "%%s\\n" $LABELS\n' > "$dir/bin/gh"; chmod +x "$dir/bin/gh"
 fail=0
-check() { # event head_ref labels expected
-  out=$(GITHUB_EVENT_NAME=$1 HEAD_REF=$2 LABELS=$3 PR=1 GITHUB_REPOSITORY=x/y GITHUB_OUTPUT=$dir/out PATH="$dir/bin:$PATH" bash "$dir/run.sh" >/dev/null && sed -n 's/^brands=//p' "$dir/out" | jq -r 'map(.name) | join(",")')
+check() {
+  GITHUB_EVENT_NAME=$1 GITHUB_OUTPUT=$dir/out bash "$dir/run.sh"
+  out=$(sed -n 's/^brands=//p' "$dir/out")
   rm -f "$dir/out"
-  if [[ "$out" == "$4" ]]; then echo "ok   $1 ${2:--} [$3] -> $out"; else echo "FAIL $1 ${2:--} [$3] -> $out, want $4"; fail=1; fi
+  if jq -e 'length == 1 and (.[0] | .name == "w4-office" and .company_name == "W4" and .product_name == "W4 Office" and .extra_bake_files_common == "./w4/branding.hcl")' <<<"$out" >/dev/null; then
+    echo "ok   $1 selects the W4 Office profile"
+  else
+    echo "FAIL $1 returned an unexpected profile: $out"
+    fail=1
+  fi
 }
-both=euro-office,nextcloud-office
-check pull_request feat/x "" euro-office
-check pull_request feat/x "bug enhancement" euro-office
-check pull_request feat/x "bug full-build" $both
-check pull_request feat/x "full-build-x" euro-office
-check pull_request release/v9.3.9 "" $both
-check pull_request renovate/vue "" $both
-check pull_request chore/nightly-submodule-bump "" $both
-check push "" "" $both
-check workflow_dispatch "" "" $both
+
+check pull_request
+check push
+check workflow_dispatch
 
 # ci-result: a skipped required check counts as passed, so the job itself must never skip.
 cond=$(yq '.jobs.ci-result.if' "$wf")

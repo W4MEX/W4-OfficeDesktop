@@ -49,96 +49,45 @@ jobs:
   # and the submodule bump PRs, PRs labelled full-build, main, tags and
   # manual runs build every brand. The label is read from the API, so
   # adding it takes effect on the next push or "Re-run all jobs".
-  # Every brand-specific setting lives here; the build jobs take the
-  # fields they need from matrix.brand.
+  # W4 owns the visual profile. The pinned forks supply the native and web assets.
   plan:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
     outputs:
       brands: ${{ steps.plan.outputs.brands }}
     steps:
-      - name: Choose brands
+      - name: Select W4 Office branding
         id: plan
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          HEAD_REF: ${{ github.head_ref }}
-          # Only one Xcode project: xcode_project/xcode_scheme are the same for
-          # every brand. euro-office's brand-assets target is a dummy with an
-          # empty overlay by design (expect_assets). Empty icon SVG fields mean "use
-          # regenerate-branding-assets.sh's own committed defaults".
-          # extra_bake_files_common is relative to workdir ./build,
-          # extra_bake_files_linux to ./build/linux (one level deeper).
-          # nextcloud-office on Windows is only a signing bundle here; it is
-          # signed and packaged on the signing server (build/windows/sign-package.ps1).
           BRANDS: |
             [
               {
-                "name": "euro-office",
-                "company_name": "Euro-Office",
-                "product_name": "Euro-Office",
-                "publisher_name": "Euro-Office",
-                "publisher_url": "https://github.com/Euro-Office/DesktopEditors",
+                "name": "w4-office",
+                "company_name": "W4",
+                "product_name": "W4 Office",
+                "publisher_name": "W4",
+                "publisher_url": "https://github.com/W4MEX/W4-OfficeDesktop",
                 "branding_dir": ".",
-                "cache_prefix": "",
+                "cache_prefix": "w4-office-",
                 "extra_bake_files": "",
                 "expect_assets": false,
-                "image_name": "desktop-common",
-                "extra_bake_files_common": "",
+                "image_name": "w4-office-desktop-common",
+                "extra_bake_files_common": "./w4/branding.hcl",
                 "extra_targets_common": "",
                 "extra_bake_files_linux": "",
                 "extra_targets_linux": "",
                 "sign": false,
                 "xcode_project": "desktop-apps/macos/Euro-Office.xcodeproj",
                 "xcode_scheme": "Euro-Office-arm",
-                "app_bundle": "Euro-Office.app",
-                "package_name": "Euro-Office-DesktopEditors",
-                "bundle_id": "asc.euro-office.Euro-Office",
-                "app_icon_svg": "",
-                "tab_icon_light_svg": "",
-                "tab_icon_dark_svg": ""
-              },
-              {
-                "name": "nextcloud-office",
-                "company_name": "Nextcloud Office",
-                "product_name": "Nextcloud Office",
-                "publisher_name": "Nextcloud GmbH",
-                "publisher_url": "https://nextcloud.com/",
-                "branding_dir": "./build/brands/nextcloud-office-brand",
-                "cache_prefix": "nextcloud-office-",
-                "extra_bake_files": "./brands/nextcloud-office-brand/brand-desktop.hcl",
-                "expect_assets": true,
-                "image_name": "no-desktop-common",
-                "extra_bake_files_common": "",
-                "extra_targets_common": "",
-                "extra_bake_files_linux": "",
-                "extra_targets_linux": "",
-                "sign": true,
-                "xcode_project": "desktop-apps/macos/Euro-Office.xcodeproj",
-                "xcode_scheme": "Euro-Office-arm",
-                "app_bundle": "Nextcloud Office.app",
-                "package_name": "Nextcloud-Office-DesktopEditors",
-                "bundle_id": "asc.nextcloud-office.Nextcloud-Office",
-                "app_icon_svg": "build/brands/nextcloud-office-brand/svg/app-icon.svg",
-                "tab_icon_light_svg": "build/brands/nextcloud-office-brand/svg/logo-light.svg",
-                "tab_icon_dark_svg": "build/brands/nextcloud-office-brand/svg/logo-dark.svg"
+                "app_bundle": "W4 Office.app",
+                "package_name": "W4-Office",
+                "bundle_id": "com.w4mex.w4office",
+                "app_icon_svg": "desktop-apps/win-linux/res/icons/w4-icon.svg",
+                "tab_icon_light_svg": "desktop-apps/win-linux/res/icons/w4-office-blue.svg",
+                "tab_icon_dark_svg": "desktop-apps/win-linux/res/icons/w4-office-white.svg"
               }
             ]
-        run: |
-          set -euo pipefail
-          full=true
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" && "$HEAD_REF" != release/* && "$HEAD_REF" != renovate/* && "$HEAD_REF" != chore/nightly-submodule-bump ]]; then
-            labels=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
-            grep -qx full-build <<<"$labels" || full=false
-          fi
-          if [[ "$full" == "true" ]]; then
-            brands=$(jq -c . <<<"$BRANDS")
-          else
-            echo "::notice::euro-office only. Add the full-build label and re-run for every brand."
-            brands=$(jq -c '[.[] | select(.name == "euro-office")]' <<<"$BRANDS")
-          fi
-          echo "brands=$brands" >> "$GITHUB_OUTPUT"
+        run: echo "brands=$(jq -c . <<<"$BRANDS")" >> "$GITHUB_OUTPUT"
+
 
   version:
     runs-on: ubuntu-latest
@@ -240,14 +189,6 @@ jobs:
           submodules: false
           persist-credentials: false
 
-      - name: Checkout nextcloud-office-brand repo
-        if: matrix.brand.name == 'nextcloud-office'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
-          persist-credentials: false
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
@@ -330,14 +271,6 @@ jobs:
         run: |
           echo "BUILD_COMMITS=DesktopEditors=$(git rev-parse HEAD) $(git submodule foreach --quiet 'echo $name=$(git rev-parse HEAD)' | tr '\n' ' ')" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
-
-      - name: Checkout nextcloud-office-brand repo
-        if: matrix.brand.name == 'nextcloud-office'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
-          persist-credentials: false
 
       - name: Debug workspace
         run: |
@@ -506,14 +439,6 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Checkout nextcloud-office-brand repo
-        if: matrix.brand.name == 'nextcloud-office'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
-          persist-credentials: false
-
       - uses: actions/download-artifact@v4
         with:
           name: common-files-${{ matrix.brand.name }}
@@ -630,6 +555,23 @@ jobs:
             -CompanyName "${{ matrix.brand.company_name }}" `
             -ProductName "${{ matrix.brand.product_name }}"
 
+      - name: Verify W4 Office branding
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-Item -LiteralPath 'desktopeditors/editors.exe'
+          if ($exe.VersionInfo.ProductName -ne 'W4 Office' -or $exe.VersionInfo.CompanyName -ne 'W4') {
+            throw 'The editor executable lacks W4 Office product metadata.'
+          }
+          foreach ($page in 'desktopeditors/index.html', 'desktopeditors/editors/web-apps/apps/documenteditor/main/index.html') {
+            if (!(Select-String -LiteralPath $page -Pattern 'W4 Office' -SimpleMatch -Quiet)) {
+              throw "W4 Office branding missing from $page"
+            }
+          }
+          if (!(Test-Path -LiteralPath 'desktopeditors/app.ico' -PathType Leaf)) {
+            throw 'The installed W4 app icon is missing.'
+          }
+
       # Both brands of an arch share the key: the second save is skipped.
       # Not empty: an exact hit would never be saved again.
       - name: Save vcpkg binary cache
@@ -717,14 +659,6 @@ jobs:
         with:
           path: .
           submodules: recursive
-          persist-credentials: false
-
-      - name: Checkout nextcloud-office-brand repo
-        if: matrix.brand.name == 'nextcloud-office'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
@@ -884,14 +818,6 @@ jobs:
         with:
           path: .
           submodules: recursive
-          persist-credentials: false
-
-      - name: Checkout nextcloud-office-brand repo
-        if: matrix.brand.name == 'nextcloud-office'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
