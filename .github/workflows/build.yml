@@ -144,6 +144,8 @@ jobs:
 
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       product_version:      ${{ steps.meta.outputs.product_version }}
       build_number:         ${{ steps.meta.outputs.build_number }}
@@ -154,7 +156,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: false
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Compute version
         id: meta
@@ -238,7 +240,7 @@ jobs:
           # The render container's context is the brand repo, not the monorepo,
           # so the multi-GB submodules are pure cost here.
           submodules: false
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Checkout nextcloud-office-brand repo
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
