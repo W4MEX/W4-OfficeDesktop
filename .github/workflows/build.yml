@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-  # PRs are expected from same-repo branches only. A fork PR gets a read-only
-  # GITHUB_TOKEN and no secrets, so EURO_OFFICE_MIRROR_TOKEN (required to fetch
-  # the private submodules + the brand repo) is empty and the build hard-fails.
+  # Publishing build caches requires a same-repository workflow token.
   pull_request:
   workflow_dispatch:
 
@@ -15,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io/euro-office
+  REGISTRY: ghcr.io/w4mex
   CACHE_IMAGE_NAME: desktopeditors-build-cache
   BUILD_NUMBER: dev.1
   BUILD_ROOT: /package
@@ -144,6 +142,8 @@ jobs:
 
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       product_version:      ${{ steps.meta.outputs.product_version }}
       build_number:         ${{ steps.meta.outputs.build_number }}
@@ -154,7 +154,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: false
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Compute version
         id: meta
@@ -238,14 +238,15 @@ jobs:
           # The render container's context is the brand repo, not the monorepo,
           # so the multi-GB submodules are pure cost here.
           submodules: false
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Euro-Office/nextcloud-office-brand
           path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -253,7 +254,7 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -322,7 +323,7 @@ jobs:
         with:
           path: .
           submodules: recursive
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Record build commits
         shell: bash
@@ -331,11 +332,12 @@ jobs:
           echo "BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
 
       - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Euro-Office/nextcloud-office-brand
           path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Debug workspace
         run: |
@@ -384,7 +386,7 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -502,14 +504,15 @@ jobs:
         with:
           path: .
           submodules: recursive
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Euro-Office/nextcloud-office-brand
           path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - uses: actions/download-artifact@v4
         with:
@@ -714,14 +717,15 @@ jobs:
         with:
           path: .
           submodules: recursive
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Euro-Office/nextcloud-office-brand
           path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - uses: actions/download-artifact@v4
         with:
@@ -773,7 +777,7 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -880,14 +884,15 @@ jobs:
         with:
           path: .
           submodules: recursive
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Euro-Office/nextcloud-office-brand
           path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+          persist-credentials: false
 
       - uses: actions/download-artifact@v4
         with:

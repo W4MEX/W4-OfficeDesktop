@@ -13,19 +13,16 @@ identifier and publishing workflow.
 The core patch bounds the reads when encoding transparent pixels in font
 thumbnails and reserves enough space for the encoded output.
 
-From the repository root, initialize the pinned submodules and apply the patch
-to a clean core checkout before building:
+From the repository root, initialize the pinned submodules:
 
 ```powershell
 git submodule update --init --recursive
-git -C core apply --check ../build/windows/font-thumbnail-bounds.patch
-git -C core apply ../build/windows/font-thumbnail-bounds.patch
 ```
 
 Build the Windows payload using the instructions in [README.md](README.md).
-Use the rebuilt core, since a cached package from before the patch contains
-the original DLL. Take `graphics.dll` from the rebuilt Windows x64 converter
-payload. Repackage the USB r2 ZIP using the DLL from that build:
+The Windows build script applies the patch to the core worktree, which makes
+the core package fetcher rebuild from source. Take `graphics.dll` from the rebuilt
+Windows x64 converter payload and use it to repackage the USB r2 ZIP:
 
 ```powershell
 .\build\windows\repack-usb.ps1 -BaseZip .\W4-Office-9.3.9.1-USB-r2-x64.zip `
