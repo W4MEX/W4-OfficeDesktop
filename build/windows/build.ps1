@@ -336,17 +336,6 @@ Either download the 'common-files' CI artifact and pass -CommonDir, or rerun wit
     # changes). sccache is used when it is on PATH; verify with
     # `sccache --show-stats` after the build.
     Write-Step "7. Build"
-    $coreRoot = Join-Path $RepoRoot 'core'
-    $graphicsPatch = Join-Path $PSScriptRoot 'font-thumbnail-bounds.patch'
-    # The core package fetcher only uses prebuilt packages for clean checkouts.
-    # Apply to the worktree so the native build compiles the patched core.
-    git -C $coreRoot apply --reverse --check $graphicsPatch 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        git -C $coreRoot apply --check $graphicsPatch
-        Assert-LastExit "Check font-thumbnail patch"
-        git -C $coreRoot apply $graphicsPatch
-        Assert-LastExit "Apply font-thumbnail patch"
-    }
     if (Get-Command sccache -ErrorAction SilentlyContinue) { sccache --zero-stats | Out-Null }
     & (Join-Path $RepoRoot 'desktop-apps\scripts\build.ps1') `
         -Arch $Arch -BuildDir $BuildDir -Core (Join-Path $RepoRoot 'core') -SdkVersion $WinSdkVersion -Ccache:$Ccache `
