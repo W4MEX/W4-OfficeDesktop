@@ -15,7 +15,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io/w4mex
   CACHE_IMAGE_NAME: desktopeditors-build-cache
-  BUILD_NUMBER: dev.1
+  BUILD_NUMBER: "2"
   BUILD_ROOT: /package
   # Releases take only core packages built on core's main and stable branches
   EO_CORE_CHANNELS: ${{ startsWith(github.ref, 'refs/tags/') && 'main' || '' }}
@@ -410,7 +410,7 @@ jobs:
       packages: windows-x64/desktop windows-arm64/desktop linux-amd64/desktop linux-arm64/desktop macos-arm64/desktop
 
   build-windows:
-    name: build-windows (${{ matrix.arch }}, ${{ matrix.brand.name }})
+    name: build-windows (${{ matrix.arch }}, ${{ matrix.brand.name }}, ${{ matrix.edition }})
     runs-on: ${{ matrix.arch == 'arm64' && 'windows-11-arm' || 'windows-2022' }}
     needs: [plan, version, build-common, brand-assets, wait-for-core]
     strategy:
@@ -418,6 +418,7 @@ jobs:
       matrix:
         arch:
           - amd64
+        edition: [installer, usb]
         brand: ${{ fromJSON(needs.plan.outputs.brands) }}
     env:
       PYTHONUTF8: "1"
@@ -527,6 +528,7 @@ jobs:
         run: tar -xzf brand-assets/brand-assets.tar.gz -C .
 
       - name: Apply W4 USB source changes
+        if: matrix.edition == 'usb'
         shell: pwsh
         run: python .\build\windows\usb-r5\apply.py
 
@@ -614,7 +616,7 @@ jobs:
       - if: ${{ !matrix.brand.sign }}
         uses: actions/upload-artifact@v4
         with:
-          name: windows-packages-${{ matrix.brand.name }}-${{ matrix.arch }}
+          name: windows-packages-${{ matrix.brand.name }}-${{ matrix.arch }}-${{ matrix.edition }}
           path: |
             desktop-apps/package/zip/*-windows-*.zip
             desktop-apps/package/inno/*-windows-*.exe
