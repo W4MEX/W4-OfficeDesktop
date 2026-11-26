@@ -336,17 +336,6 @@ Either download the 'common-files' CI artifact and pass -CommonDir, or rerun wit
     # changes). sccache is used when it is on PATH; verify with
     # `sccache --show-stats` after the build.
     Write-Step "7. Build"
-    $coreRoot = Join-Path $RepoRoot 'core'
-    $graphicsPatch = Join-Path $PSScriptRoot 'font-thumbnail-bounds.patch'
-    # The core package fetcher only uses prebuilt packages for clean checkouts.
-    # Apply to the worktree so the native build compiles the patched core.
-    git -C $coreRoot apply --reverse --check $graphicsPatch 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        git -C $coreRoot apply --check $graphicsPatch
-        Assert-LastExit "Check font-thumbnail patch"
-        git -C $coreRoot apply $graphicsPatch
-        Assert-LastExit "Apply font-thumbnail patch"
-    }
     if (Get-Command sccache -ErrorAction SilentlyContinue) { sccache --zero-stats | Out-Null }
     & (Join-Path $RepoRoot 'desktop-apps\scripts\build.ps1') `
         -Arch $Arch -BuildDir $BuildDir -Core (Join-Path $RepoRoot 'core') -SdkVersion $WinSdkVersion -Ccache:$Ccache `
@@ -493,8 +482,26 @@ Either download the 'common-files' CI artifact and pass -CommonDir, or rerun wit
             Sync-InnoLanguages (Join-Path $env:INNOPATH 'Languages')
 
             # vc_redist.<arch>.exe was pre-staged in step 9c.
-            .\make_inno.ps1 -Version $VersionFull -Arch $Arch -Target $Target
-            Assert-LastExit "make_inno.ps1"
+            # Inno counts the unnormalized path to templates. Keep the hosted
+            # ARM64 checkout prefix short while it compiles the installer.
+            if ($env:GITHUB_ACTIONS -eq 'true' -and $Arch -eq 'arm64') {
+                $usedDrives = (Get-PSDrive -PSProvider FileSystem).Name
+                $freeDrive = 'W', 'V', 'U' | Where-Object { $_ -notin $usedDrives } | Select-Object -First 1
+                if (-not $freeDrive) { throw 'No drive letter is available for Inno Setup.' }
+                $installerDrive = "${freeDrive}:"
+                subst.exe $installerDrive (Split-Path -Parent $PackageDir)
+                Assert-LastExit "Map the desktop-apps source directory"
+                try {
+                    pwsh -NoProfile -File "$installerDrive\package\make_inno.ps1" -Version $VersionFull -Arch $Arch -Target $Target
+                    Assert-LastExit "make_inno.ps1"
+                } finally {
+                    subst.exe $installerDrive /D
+                    Assert-LastExit "Unmap the desktop-apps source directory"
+                }
+            } else {
+                .\make_inno.ps1 -Version $VersionFull -Arch $Arch -Target $Target
+                Assert-LastExit "make_inno.ps1"
+            }
 
             Rename-WindowsPackages $PackageDir $CompanyName "$ProductVersion-$BuildNumber" $Arch | Out-Null
 
