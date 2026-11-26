@@ -1,0 +1,163 @@
+diff --git a/win-linux/desktopeditors.cmake b/win-linux/desktopeditors.cmake
+index 32f1c50..9d36775 100644
+--- a/win-linux/desktopeditors.cmake
++++ b/win-linux/desktopeditors.cmake
+@@ -54,6 +54,7 @@ set(COMMON_HEADERS
+     src/cappeventfilter.h
+     src/iconfactory.h
+     src/cthemes.h
++    src/w4portable.h
+ )
+ 
+ set(COMMON_SOURCES
+@@ -96,6 +97,7 @@ set(COMMON_SOURCES
+     src/cappeventfilter.cpp
+     src/iconfactory.cpp
+     src/cthemes.cpp
++    src/w4portable.cpp
+ )
+ 
+ 
+diff --git a/win-linux/src/components/cnotification.cpp b/win-linux/src/components/cnotification.cpp
+index aece06a..dcc9ccc 100644
+--- a/win-linux/src/components/cnotification.cpp
++++ b/win-linux/src/components/cnotification.cpp
+@@ -361,7 +361,7 @@ bool CNotification::init()
+         return false;
+     }
+     WinToast::instance()->setAppName(TEXT(WINDOW_TITLE));
+-    WinToast::instance()->setAppUserModelId(TEXT(APP_USER_MODEL_ID));
++    WinToast::instance()->setAppUserModelId(W4Portable::appUserModelId().toStdWString());
+     if (IsPackage(Portable)) {
+         WinToast::instance()->setShortcutPolicy(WinToastLib::WinToast::SHORTCUT_POLICY_IGNORE);
+     } else {
+diff --git a/win-linux/src/main.cpp b/win-linux/src/main.cpp
+index 2be6430..c0925ee 100644
+--- a/win-linux/src/main.cpp
++++ b/win-linux/src/main.cpp
+@@ -52,10 +52,17 @@ int main( int argc, char *argv[] )
+     char** new_argv = argv;
+     std::vector<char*> dynamic_argv;
+ #ifdef _WIN32
++    QString portableError;
++    if (!W4Portable::initialize(&portableError)) {
++        MessageBoxW(nullptr, portableError.toStdWString().c_str(), L"W4 Office USB", MB_OK | MB_ICONERROR);
++        return 20;
++    }
+     Core_SetProcessDpiAwareness();
+     Utils::setAppUserModelId();
+     WCHAR * cm_line = GetCommandLine();
+     InputArgs::init(cm_line);
++    if (InputArgs::contains(L"--w4-portable-diagnostics"))
++        return W4Portable::writeDiagnostics() ? 0 : 21;
+     if ( InputArgs::contains(L"--assoc") ) {
+         return 0;
+     }
+diff --git a/win-linux/src/platform_win/association.cpp b/win-linux/src/platform_win/association.cpp
+index 9f3e1bd..ff295fb 100644
+--- a/win-linux/src/platform_win/association.cpp
++++ b/win-linux/src/platform_win/association.cpp
+@@ -24,6 +24,7 @@
+  */
+ 
+ #include "association.h"
++#include "../w4portable.h"
+ #include "utils.h"
+ #include "defines.h"
+ 
+@@ -370,6 +371,10 @@ Association& Association::instance()
+ 
+ void Association::chekForAssociations(int uid)
+ {
++    // A USB copy must leave the computer's default applications unchanged,
++    // including when an installed W4 edition has registered file types.
++    if (W4Portable::enabled())
++        return;
+     if (pimpl->m_ignoreAssocMsg || (time(nullptr) - pimpl->m_lastCheck) < DAY_TO_SEC)
+         return;
+ 
+diff --git a/win-linux/src/platform_win/singleapplication.cpp b/win-linux/src/platform_win/singleapplication.cpp
+index ee257e9..79e2c16 100644
+--- a/win-linux/src/platform_win/singleapplication.cpp
++++ b/win-linux/src/platform_win/singleapplication.cpp
+@@ -29,7 +29,12 @@
+ #include "defines.h"
+ #include <QThread>
+ 
+-#define RECEIVER_WINDOW WINDOW_CLASS_NAME
++static const wchar_t *receiverWindowClass()
++{
++    static const std::wstring value = (QString::fromWCharArray(WINDOW_CLASS_NAME) + W4Portable::instanceSuffix()).toStdWString();
++    return value.c_str();
++}
++#define RECEIVER_WINDOW receiverWindowClass()
+ #define RETRIES_COUNT 10
+ #define RETRIES_DELAY_MS 500
+ 
+@@ -38,7 +43,8 @@ SingleApplication::SingleApplication(int &argc, char *argv[]) :
+     QApplication(argc, argv),
+     m_isPrimary(false)
+ {
+-    m_hMutex = CreateMutex(NULL, FALSE, TEXT(APP_MUTEX_NAME));
++    const std::wstring mutexName = (QString::fromUtf8(APP_MUTEX_NAME) + W4Portable::instanceSuffix()).toStdWString();
++    m_hMutex = CreateMutexW(NULL, FALSE, mutexName.c_str());
+     if (GetLastError() != ERROR_ALREADY_EXISTS) {
+         m_isPrimary = true;
+         startPrimary();
+diff --git a/win-linux/src/prop/utils.cpp b/win-linux/src/prop/utils.cpp
+index 3fbf04c..acbdc40 100644
+--- a/win-linux/src/prop/utils.cpp
++++ b/win-linux/src/prop/utils.cpp
+@@ -28,6 +28,9 @@
+ 
+ QString Utils::getUserPath()
+ {
++#ifdef _WIN32
++    if (W4Portable::enabled()) return W4Portable::profileRoot();
++#endif
+     return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+ }
+ 
+diff --git a/win-linux/src/utils.cpp b/win-linux/src/utils.cpp
+index db365a3..0562df1 100644
+--- a/win-linux/src/utils.cpp
++++ b/win-linux/src/utils.cpp
+@@ -295,6 +295,12 @@ QString Utils::lastPath(int t)
+         _path = _reg_user.value("openPath").value<QString>(); else
+         _path = _reg_user.value("savePath").value<QString>();
+ 
++#ifdef _WIN32
++    if (W4Portable::enabled()) {
++        _path = W4Portable::restorePath(_path);
++        return !_path.isEmpty() && QDir(_path).exists() ? _path : W4Portable::documentsRoot();
++    }
++#endif
+     return !_path.isEmpty() && QDir(_path).exists() ?
+         _path : QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+ }
+@@ -302,9 +308,14 @@ QString Utils::lastPath(int t)
+ void Utils::keepLastPath(int t, const QString& p)
+ {
+     GET_REGISTRY_USER(_reg_user)
++#ifdef _WIN32
++    const QString value = W4Portable::storePath(p);
++#else
++    const QString value = p;
++#endif
+     if (t == LOCAL_PATH_OPEN)
+-        _reg_user.setValue("openPath", p); else
+-        _reg_user.setValue("savePath", p);
++        _reg_user.setValue("openPath", value); else
++        _reg_user.setValue("savePath", value);
+ }
+ 
+ bool Utils::makepath(const QString& p)
+@@ -984,7 +995,7 @@ void Utils::setAppUserModelId()
+         HRESULT (WINAPI *SetAppUserModelID)(PCWSTR AppID);
+         *(FARPROC*)&SetAppUserModelID = GetProcAddress(lib, "SetCurrentProcessExplicitAppUserModelID");
+         if (SetAppUserModelID)
+-            SetAppUserModelID(TEXT(APP_USER_MODEL_ID));
++            SetAppUserModelID(W4Portable::appUserModelId().toStdWString().c_str());
+         FreeLibrary(lib);
+     }
+ }
