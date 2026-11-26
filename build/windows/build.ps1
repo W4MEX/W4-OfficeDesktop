@@ -121,7 +121,7 @@ if (-not $RepoRoot) {
 }
 
 if (-not $CommonDir) { $CommonDir = Join-Path $RepoRoot 'common' }
-$VersionFull = "$ProductVersion.0"            # make.ps1 wants a 4-part System.Version
+$VersionFull = "$ProductVersion.$BuildNumber"            # make.ps1 wants a 4-part System.Version
 $InstallDir  = Join-Path $RepoRoot 'desktopeditors'
 $BuildDir    = Join-Path $RepoRoot '.build'
 $PackageDir  = Join-Path $RepoRoot 'desktop-apps\package'
