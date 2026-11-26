@@ -489,14 +489,14 @@ Either download the 'common-files' CI artifact and pass -CommonDir, or rerun wit
                 $freeDrive = 'W', 'V', 'U' | Where-Object { $_ -notin $usedDrives } | Select-Object -First 1
                 if (-not $freeDrive) { throw 'No drive letter is available for Inno Setup.' }
                 $installerDrive = "${freeDrive}:"
-                subst.exe $installerDrive $PackageDir
-                Assert-LastExit "Map the Inno Setup package directory"
+                subst.exe $installerDrive (Split-Path -Parent $PackageDir)
+                Assert-LastExit "Map the desktop-apps source directory"
                 try {
-                    pwsh -NoProfile -File "$installerDrive\make_inno.ps1" -Version $VersionFull -Arch $Arch -Target $Target
+                    pwsh -NoProfile -File "$installerDrive\package\make_inno.ps1" -Version $VersionFull -Arch $Arch -Target $Target
                     Assert-LastExit "make_inno.ps1"
                 } finally {
                     subst.exe $installerDrive /D
-                    Assert-LastExit "Unmap the Inno Setup package directory"
+                    Assert-LastExit "Unmap the desktop-apps source directory"
                 }
             } else {
                 .\make_inno.ps1 -Version $VersionFull -Arch $Arch -Target $Target
